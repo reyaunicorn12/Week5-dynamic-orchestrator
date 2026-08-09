@@ -8,8 +8,8 @@
       body {
         margin: 0;
         font-family: Arial, sans-serif;
-        background: #0f172a;
-        color: #e2e8f0;
+        background: #004cff;
+        color: #06ff3c;
       }
       .layout {
         display: grid;
@@ -66,6 +66,16 @@
         font-size: 14px;
         color: #94a3b8;
       }
+      .status {
+        margin-top: 8px;
+        font-size: 13px;
+        color: #7dd3fc;
+      }
+      .error {
+        margin-top: 8px;
+        font-size: 13px;
+        color: #fca5a5;
+      }
       .trace-item {
         margin-top: 8px;
         padding: 8px;
@@ -87,6 +97,8 @@
           <button class="ask-btn" type="submit">Ask</button>
         </form>
         <div id="question-log" class="question-log"></div>
+        <div id="status" class="status"></div>
+        <div id="error" class="error"></div>
         <div id="outputs"></div>
       </main>
       <aside class="panel">
@@ -95,7 +107,7 @@
       </aside>
     </div>
     <script type="module">
-      import { createOrchestratorState, toggleAgent, runOrchestration } from '/src/app.js';
+      import { createOrchestratorState, toggleAgent, runOrchestration, getActiveAgents } from '/src/app.js';
 
       const state = createOrchestratorState();
       const outputEl = document.getElementById('outputs');
@@ -104,16 +116,61 @@
       const questionFormEl = document.getElementById('question-form');
       const questionInputEl = document.getElementById('question-input');
       const questionLogEl = document.getElementById('question-log');
+      const statusEl = document.getElementById('status');
+      const errorEl = document.getElementById('error');
+      const askButtonEl = questionFormEl.querySelector('button[type="submit"]');
 
       const session = {
         currentQuestion: 'Investigate the mysterious package',
-        history: []
+        history: [],
+        latestResult: null,
+        isLoading: false,
+        error: ''
       };
+
+      async function orchestrateQuestion(question) {
+        const activeAgents = getActiveAgents(state);
+        if (!activeAgents.length) {
+          session.error = 'Turn on at least one agent before asking a question.';
+          session.latestResult = { prompt: question, outputs: [], trace: [] };
+          render();
+          return;
+        }
+
+        session.isLoading = true;
+        session.error = '';
+        render();
+
+        try {
+          const response = await fetch('/api/orchestrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question, activeAgents })
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Request failed.');
+          }
+
+          session.latestResult = data;
+        } catch (error) {
+          session.error = error.message;
+          session.latestResult = runOrchestration(state, question);
+        } finally {
+          session.isLoading = false;
+          render();
+        }
+      }
 
       function render() {
         agentListEl.innerHTML = '';
         outputEl.innerHTML = '';
         traceEl.innerHTML = '';
+        statusEl.textContent = session.isLoading ? 'Agents are thinking...' : '';
+        errorEl.textContent = session.error;
+        askButtonEl.disabled = session.isLoading;
+        askButtonEl.textContent = session.isLoading ? 'Thinking...' : 'Ask';
         questionLogEl.textContent = session.history.length
           ? `Last question: ${session.history[session.history.length - 1]}`
           : 'Ask your first question to start orchestration.';
@@ -130,7 +187,7 @@
           agentListEl.appendChild(card);
         });
 
-        const result = runOrchestration(state, session.currentQuestion);
+        const result = session.latestResult || runOrchestration(state, session.currentQuestion);
         result.outputs.forEach((item) => {
           const div = document.createElement('div');
           div.className = 'output';
@@ -150,6 +207,12 @@
         const button = event.target.closest('button');
         if (!button) return;
         toggleAgent(state, button.dataset.agent);
+
+        if (session.history.length) {
+          orchestrateQuestion(session.currentQuestion);
+          return;
+        }
+
         render();
       });
 
@@ -161,7 +224,7 @@
         session.currentQuestion = question;
         session.history.push(question);
         questionInputEl.value = '';
-        render();
+        orchestrateQuestion(question);
       });
 
       render();
