@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamic Orchestrator</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 220px 1fr 260px;
+        min-height: 100vh;
+      }
+      .panel {
+        padding: 16px;
+        border-right: 1px solid #334155;
+      }
+      .panel:last-child {
+        border-right: none;
+      }
+      .agent-card {
+        background: #111827;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      .on { background: #22c55e; color: white; }
+      .off { background: #64748b; color: white; }
+      .output {
+        margin-top: 12px;
+        padding: 10px;
+        background: #111827;
+        border-radius: 8px;
+      }
+      .trace-item {
+        margin-top: 8px;
+        padding: 8px;
+        background: #1e293b;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="panel">
+        <h3>Agents</h3>
+        <div id="agent-list"></div>
+      </aside>
+      <main class="panel">
+        <h3>Agent Outputs</h3>
+        <div id="outputs"></div>
+      </main>
+      <aside class="panel">
+        <h3>Workflow Trace</h3>
+        <div id="trace"></div>
+      </aside>
+    </div>
+    <script type="module">
+      import { createOrchestratorState, toggleAgent, runOrchestration } from '../src/app.js';
+
+      const state = createOrchestratorState();
+      const outputEl = document.getElementById('outputs');
+      const traceEl = document.getElementById('trace');
+      const agentListEl = document.getElementById('agent-list');
+
+      function render() {
+        agentListEl.innerHTML = '';
+        outputEl.innerHTML = '';
+        traceEl.innerHTML = '';
+
+        state.agents.forEach((agent) => {
+          const card = document.createElement('div');
+          card.className = 'agent-card';
+          card.innerHTML = `
+            <strong>${agent.name}</strong><br/>
+            <button class="${agent.enabled ? 'on' : 'off'}" data-agent="${agent.id}">
+              ${agent.enabled ? 'ON' : 'OFF'}
+            </button>
+          `;
+          agentListEl.appendChild(card);
+        });
+
+        const result = runOrchestration(state, 'Investigate the mysterious package');
+        result.outputs.forEach((item) => {
+          const div = document.createElement('div');
+          div.className = 'output';
+          div.textContent = item.content;
+          outputEl.appendChild(div);
+        });
+
+        result.trace.forEach((step) => {
+          const div = document.createElement('div');
+          div.className = 'trace-item';
+          div.textContent = `${step.step} (${step.agentId})`;
+          traceEl.appendChild(div);
+        });
+      }
+
+      agentListEl.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        toggleAgent(state, button.dataset.agent);
+        render();
+      });
+
+      render();
+    </script>
+  </body>
+</html>
