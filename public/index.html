@@ -44,6 +44,28 @@
         background: #111827;
         border-radius: 8px;
       }
+      .question-form {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .question-form input {
+        flex: 1;
+        border: 1px solid #334155;
+        background: #0b1220;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .ask-btn {
+        background: #0284c7;
+        color: #ffffff;
+      }
+      .question-log {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #94a3b8;
+      }
       .trace-item {
         margin-top: 8px;
         padding: 8px;
@@ -60,6 +82,11 @@
       </aside>
       <main class="panel">
         <h3>Agent Outputs</h3>
+        <form id="question-form" class="question-form">
+          <input id="question-input" type="text" placeholder="Ask a question for the agents" required />
+          <button class="ask-btn" type="submit">Ask</button>
+        </form>
+        <div id="question-log" class="question-log"></div>
         <div id="outputs"></div>
       </main>
       <aside class="panel">
@@ -68,17 +95,28 @@
       </aside>
     </div>
     <script type="module">
-      import { createOrchestratorState, toggleAgent, runOrchestration } from '../src/app.js';
+      import { createOrchestratorState, toggleAgent, runOrchestration } from '/src/app.js';
 
       const state = createOrchestratorState();
       const outputEl = document.getElementById('outputs');
       const traceEl = document.getElementById('trace');
       const agentListEl = document.getElementById('agent-list');
+      const questionFormEl = document.getElementById('question-form');
+      const questionInputEl = document.getElementById('question-input');
+      const questionLogEl = document.getElementById('question-log');
+
+      const session = {
+        currentQuestion: 'Investigate the mysterious package',
+        history: []
+      };
 
       function render() {
         agentListEl.innerHTML = '';
         outputEl.innerHTML = '';
         traceEl.innerHTML = '';
+        questionLogEl.textContent = session.history.length
+          ? `Last question: ${session.history[session.history.length - 1]}`
+          : 'Ask your first question to start orchestration.';
 
         state.agents.forEach((agent) => {
           const card = document.createElement('div');
@@ -92,7 +130,7 @@
           agentListEl.appendChild(card);
         });
 
-        const result = runOrchestration(state, 'Investigate the mysterious package');
+        const result = runOrchestration(state, session.currentQuestion);
         result.outputs.forEach((item) => {
           const div = document.createElement('div');
           div.className = 'output';
@@ -112,6 +150,17 @@
         const button = event.target.closest('button');
         if (!button) return;
         toggleAgent(state, button.dataset.agent);
+        render();
+      });
+
+      questionFormEl.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const question = questionInputEl.value.trim();
+        if (!question) return;
+
+        session.currentQuestion = question;
+        session.history.push(question);
+        questionInputEl.value = '';
         render();
       });
 
