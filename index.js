@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0';
 const chatEndpoint = process.env.CHAT_ENDPOINT || 'https://vibe-proxy-gqv4.onrender.com/v1/chat/completions';
 const chatApiKey = process.env.CHAT_API_KEY || 'sk-vibe-summer-2026';
 const chatModel = process.env.CHAT_MODEL || 'class-chat-model';
@@ -143,6 +144,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`Dynamic orchestrator running on http://localhost:${port}`);
+server.listen(port, host, () => {
+  const publicHost = host === '0.0.0.0' ? 'localhost' : host;
+  console.log(`Dynamic orchestrator running on http://${publicHost}:${port} (bound to ${host})`);
 });
